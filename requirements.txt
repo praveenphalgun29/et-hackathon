@@ -1,0 +1,22 @@
+# Web Framework
+fastapi
+uvicorn
+python-dotenv
+
+# AI & Agents
+langchain
+langchain-community
+langchain-huggingface
+langgraph
+langsmith
+groq
+google-genai
+
+# Vector DB & Data
+pinecone
+pypdf
+pydantic
+requests
+
+sentence-transformers
+langchain-groq
