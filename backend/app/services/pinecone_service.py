@@ -11,14 +11,19 @@ class PineconeService:
         self.index_name = os.getenv("PINECONE_INDEX_NAME")
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-        if self.index_name not in self.pc.list_indexes().names():
-            self.pc.create_index(
-                name=self.index_name,
-                dimension=384,
-                metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region="us-east-1")
-            )
-        self.index = self.pc.Index(self.index_name)
+        # Bypassing list_indexes for potential permission issues
+        # if self.index_name not in self.pc.list_indexes().names():
+        #     self.pc.create_index(
+        #         name=self.index_name,
+        #         dimension=384,
+        #         metric="cosine",
+        #         spec=ServerlessSpec(cloud="aws", region="us-east-1")
+        #     )
+        try:
+            self.index = self.pc.Index(self.index_name)
+        except Exception as e:
+            print(f"[PINECONE ERROR] Failed to initialize index: {e}")
+            self.index = None
 
     def upsert_news(self, news_items, topic: str = "general"):
         topic_clean = topic.lower().strip()
@@ -35,13 +40,15 @@ class PineconeService:
                 "metadata": metadata
             })
 
-        if vectors:
+        if vectors and self.index:
             self.index.upsert(vectors=vectors)
             print(f"[PINECONE] Upserted {len(vectors)} articles tagged topic='{topic_clean}'")
             
             # Confirm index stats after upsert
             stats = self.index.describe_index_stats()
             print(f"[PINECONE] Total vectors in index: {stats.get('total_vector_count', 'unknown')}")
+        elif not self.index:
+            print("[PINECONE WARNING] Skipping upsert because index is not initialized.")
 
     def query_news(self, query_text: str, top_k: int = 5) -> dict:
         topic_clean = query_text.lower().strip()
@@ -50,6 +57,10 @@ class PineconeService:
         print(f"[PINECONE] Querying with filter: topic='{topic_clean}'")
 
         try:
+            if not self.index:
+                print("[PINECONE WARNING] Index not initialized, skipping filtered query.")
+                return {"matches": []}
+                
             results = self.index.query(
                 vector=query_vec,
                 top_k=top_k,
@@ -70,10 +81,14 @@ class PineconeService:
         except Exception as e:
             print(f"[PINECONE] Filter error: {e} — falling back to unfiltered")
 
-        results = self.index.query(
-            vector=query_vec,
-            top_k=top_k,
-            include_metadata=True
-        )
-        print(f"[PINECONE] Unfiltered fallback: {len(results.get('matches', []))} results")
-        return results
+        if self.index:
+            results = self.index.query(
+                vector=query_vec,
+                top_k=top_k,
+                include_metadata=True
+            )
+            print(f"[PINECONE] Unfiltered fallback: {len(results.get('matches', []))} results")
+            return results
+        
+        print("[PINECONE WARNING] Index not initialized, returning empty results.")
+        return {"matches": []}

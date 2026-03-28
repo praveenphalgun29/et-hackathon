@@ -8,8 +8,27 @@ from google import genai
 from app.services.pinecone_service import PineconeService
 
 ps = PineconeService()
-groq_llm = ChatGroq(temperature=0.1, model_name="llama-3.1-8b-instant")
+groq_llm = ChatGroq(temperature=0.1, model_name="llama-3.1-8b-instant", timeout=20)
 genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+
+
+def call_llm_with_fallback(prompt: str, is_json: bool = False):
+    """Tries Groq, falls back to Gemini."""
+    try:
+        response = groq_llm.invoke(prompt)
+        return response.content
+    except Exception as e:
+        print(f"[LLM FALLBACK] Groq failed, trying Gemini: {e}")
+        try:
+            # gemini-1.5-flash is extremely fast and widely available
+            response = genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=prompt
+            )
+            return response.text
+        except Exception as e2:
+            print(f"[LLM FALLBACK] Gemini also failed: {e2}")
+            return None
 
 
 def master_router(state: AgentState):
@@ -71,6 +90,12 @@ def persona_editor_node(state: AgentState):
     lookup = state.get('keywords') or state['query']
     results = ps.query_news(lookup, top_k=5)
     matches = results.get('matches', [])
+
+    # Fallback to pre-retrieved docs if Pinecone is empty
+    if not matches and state.get('retrieved_docs'):
+        print(f"[PERSONA EDITOR] Falling back to pre-retrieved docs ({len(state['retrieved_docs'])})")
+        matches = state['retrieved_docs']
+
     context = build_rich_context(matches)
 
     if not context:
@@ -92,8 +117,11 @@ Context (real articles only):
 Write a clear, engaging 3-4 paragraph summary tailored specifically for a {state['persona']}.
 Do not use generic phrases like "it's important to note". Be direct and specific.
 """
-    response = groq_llm.invoke(prompt)
-    return {"final_output": response.content}
+    llm_output = call_llm_with_fallback(prompt)
+    if not llm_output:
+        return {"final_output": "Error: Both Groq and Gemini LLM services are currently unavailable. Please check API keys."}
+        
+    return {"final_output": llm_output}
 
 
 def synthesizer_node(state: AgentState):
@@ -103,6 +131,12 @@ def synthesizer_node(state: AgentState):
 
     results = ps.query_news(lookup, top_k=6)
     matches = results.get('matches', [])
+
+    # Fallback to pre-retrieved docs if Pinecone is empty
+    if not matches and state.get('retrieved_docs'):
+        print(f"[SYNTHESIZER] Falling back to pre-retrieved docs ({len(state['retrieved_docs'])})")
+        matches = state['retrieved_docs']
+
     context = build_rich_context(matches)
 
     if not context:
@@ -120,11 +154,8 @@ If the answer is not in the articles, say so honestly — do not invent.
 Articles:
 {context}
 """
-        response = genai_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        return {"final_output": response.text}
+        response_text = call_llm_with_fallback(prompt)
+        return {"final_output": response_text or "Error: LLM services unavailable for follow-up."}
 
     prompt = f"""You are an ET Intelligence Analyst. Using ONLY the articles below,
 synthesize a structured intelligence briefing about: {lookup}
@@ -147,11 +178,8 @@ Structure with exactly these FOUR sections:
 Context (real articles only):
 {context}
 """
-    response = genai_client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt
-    )
-    return {"final_output": response.text}
+    response_text = call_llm_with_fallback(prompt)
+    return {"final_output": response_text or "Error: LLM services unavailable for briefing."}
 
 
 def story_architect_node(state: AgentState):
@@ -165,6 +193,12 @@ def story_architect_node(state: AgentState):
 
     results = ps.query_news(lookup, top_k=6)
     matches = results.get('matches', [])
+
+    # Fallback to pre-retrieved docs if Pinecone is empty
+    if not matches and state.get('retrieved_docs'):
+        print(f"[STORY ARC] Falling back to pre-retrieved docs ({len(state['retrieved_docs'])})")
+        matches = state['retrieved_docs']
+
     context = build_rich_context(matches)
 
     if not matches or not context:
@@ -201,7 +235,8 @@ Output EXACTLY this format:
 Context:
 {context}
 """
-    timeline = safe_parse_json_array(groq_llm.invoke(timeline_prompt).content)
+    timeline_raw = call_llm_with_fallback(timeline_prompt)
+    timeline = safe_parse_json_array(timeline_raw) if timeline_raw else []
     print(f"[STORY ARC] Timeline: {len(timeline)} events")
 
     # --- LLM Call 2: Key Players ---
@@ -224,7 +259,8 @@ Rules:
 Context:
 {context}
 """
-    key_players = safe_parse_json_array(groq_llm.invoke(players_prompt).content)
+    players_raw = call_llm_with_fallback(players_prompt)
+    key_players = safe_parse_json_array(players_raw) if players_raw else []
     print(f"[STORY ARC] Key players: {len(key_players)} found")
 
     # --- LLM Call 3: Contrarian Perspectives ---
@@ -255,9 +291,8 @@ Rules:
 Context:
 {context}
 """
-    contrarian_perspectives = safe_parse_json_array(
-        groq_llm.invoke(contrarian_prompt).content
-    )
+    contrarian_raw = call_llm_with_fallback(contrarian_prompt)
+    contrarian_perspectives = safe_parse_json_array(contrarian_raw) if contrarian_raw else []
     print(f"[STORY ARC] Contrarian perspectives: {len(contrarian_perspectives)} found")
 
     # --- LLM Call 4: What To Watch Next (refined — must cite specific signals) ---
@@ -287,9 +322,8 @@ Output EXACTLY this format:
 Context:
 {context}
 """
-    what_to_watch = safe_parse_json_array(
-        groq_llm.invoke(predictions_prompt).content
-    )
+    predictions_raw = call_llm_with_fallback(predictions_prompt)
+    what_to_watch = safe_parse_json_array(predictions_raw) if predictions_raw else []
     print(f"[STORY ARC] What to watch: {len(what_to_watch)} predictions")
 
     # --- LLM Call 5: One-paragraph summary for context ---
@@ -299,8 +333,8 @@ based ONLY on the articles below. Be factual and specific.
 Context:
 {context}
 """
-    summary_response = groq_llm.invoke(summary_prompt)
-    summary = summary_response.content.strip()
+    summary_raw = call_llm_with_fallback(summary_prompt)
+    summary = summary_raw.strip() if summary_raw else "Insufficient data for summary."
 
     # --- Combine all 5 components ---
     final_data = {
@@ -349,8 +383,8 @@ STRICT RULES:
 Content to translate:
 {content}
 """
-    response = groq_llm.invoke(prompt)
-    return {"final_output": response.content, "next_step": "end"}
+    response_text = call_llm_with_fallback(prompt)
+    return {"final_output": response_text or content, "next_step": "end"}
 
 
 # --- Graph Construction ---
