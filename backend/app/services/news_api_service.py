@@ -28,7 +28,6 @@ class NewsApiService:
                 print(f"[NEWS API] Startup check passed (Status: {res.status_code})")
         except Exception as e:
             print(f"[NEWS API] Startup check failed (Network?): {e}")
-            # Don't set is_unauthorized here, might be a temporary network blip
 
     def _build_keyword_ladder(self, keywords: str) -> list:
         """

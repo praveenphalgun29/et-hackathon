@@ -11,14 +11,6 @@ class PineconeService:
         self.index_name = os.getenv("PINECONE_INDEX_NAME")
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-        # Bypassing list_indexes for potential permission issues
-        # if self.index_name not in self.pc.list_indexes().names():
-        #     self.pc.create_index(
-        #         name=self.index_name,
-        #         dimension=384,
-        #         metric="cosine",
-        #         spec=ServerlessSpec(cloud="aws", region="us-east-1")
-        #     )
         try:
             self.index = self.pc.Index(self.index_name)
         except Exception as e:

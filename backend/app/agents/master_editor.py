@@ -20,7 +20,6 @@ def call_llm_with_fallback(prompt: str, is_json: bool = False):
     except Exception as e:
         print(f"[LLM FALLBACK] Groq failed, trying Gemini: {e}")
         try:
-            # gemini-1.5-flash is extremely fast and widely available
             response = genai_client.models.generate_content(
                 model="gemini-1.5-flash",
                 contents=prompt
@@ -91,7 +90,6 @@ def persona_editor_node(state: AgentState):
     results = ps.query_news(lookup, top_k=5)
     matches = results.get('matches', [])
 
-    # Fallback to pre-retrieved docs if Pinecone is empty
     if not matches and state.get('retrieved_docs'):
         print(f"[PERSONA EDITOR] Falling back to pre-retrieved docs ({len(state['retrieved_docs'])})")
         matches = state['retrieved_docs']
