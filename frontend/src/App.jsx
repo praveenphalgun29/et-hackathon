@@ -24,8 +24,15 @@ function App() {
 
   const API_BASE = 'http://localhost:8000';
 
-  const handleSearch = async (newQuery, overrideLanguage) => {
+  const handleSearch = async (newQuery, overrideLanguage, followUp = "") => {
     const activeLang = overrideLanguage || language;
+    let finalQuery = newQuery;
+    
+    // Force Story Arc synthesis if we are in that view
+    if (activeView === 'storyarc' && !newQuery.toLowerCase().includes('track') && !newQuery.toLowerCase().includes('arc')) {
+      finalQuery = `Track the story arc of ${newQuery}`;
+    }
+    
     setQuery(newQuery);
     setLoading(true);
     try {
@@ -33,10 +40,10 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: newQuery,
+          query: finalQuery,
           persona,
           language: activeLang,
-          follow_up: ""
+          follow_up: followUp
         })
       });
       const data = await response.json();
@@ -58,8 +65,9 @@ function App() {
         if (content.startsWith('ARC_DATA_START')) {
           setActiveView('storyarc');
         } else if (activeView === 'navigator') {
-          // If a topic was selected from Navigator, show it in the Newsroom
-          setActiveView('newsroom');
+          // Stay in navigator to show the results there
+        } else if (activeView === 'storyarc') {
+          // Stay in storyarc to show results there
         } else if (activeView !== 'vernacular') {
           // Default to newsroom if we are not in a special tool
           setActiveView('newsroom');

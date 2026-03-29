@@ -29,6 +29,12 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
   const [query, setQuery] = useState('');
   const [expandedCard, setExpandedCard] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [followUpQuery, setFollowUpQuery] = useState('');
+
+  const cleanLine = (text) => {
+    if (!text) return "";
+    return text.replace(/#/g, '').replace(/\*\*/g, '').replace(/\*/g, '').trim();
+  };
 
   useEffect(() => {
     let interval;
@@ -43,22 +49,38 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
     return () => clearInterval(interval);
   }, [loading, briefingData.length]);
 
-  const handleSearch = (e) => {
+  const handleSearchLocal = (e) => {
     e.preventDefault();
     if (query.trim()) onSearch(query);
+  };
+
+  const handleFollowUpSubmit = (e) => {
+    e.preventDefault();
+    if (followUpQuery.trim() && searchResult) {
+      onSearch(searchResult.query || query, null, followUpQuery); // Use original query + new follow-up
+      setFollowUpQuery('');
+    }
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Morning";
+    if (hour < 17) return "Afternoon";
+    return "Evening";
   };
 
   return (
     <div className="max-container">
       <div className="newsroom-grid">
         <div className="briefing-area">
+          {/* ... existing search motion.div ... */}
           <motion.div 
             initial="hidden"
             animate="visible"
             variants={containerVariants}
             style={{ marginBottom: '40px' }}
           >
-            <form onSubmit={handleSearch} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+            <form onSubmit={handleSearchLocal} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
               <div style={{ flex: 1, position: 'relative' }}>
                 <input
                   type="text"
@@ -101,7 +123,7 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
           <section>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px' }}>
               <div>
-                <h2 style={{ fontSize: '24px', marginBottom: '4px' }}>Your Morning Briefing</h2>
+                <h2 style={{ fontSize: '24px', marginBottom: '4px' }}>Your {getGreeting()} Briefing</h2>
                 <p style={{ color: 'var(--muted-gray)', fontSize: '14px' }}>Personalized for {persona} · Updated just now</p>
               </div>
             </div>
@@ -133,6 +155,28 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
                     <ReactMarkdown>
                       {searchResult.response || searchResult.detail || "No results found."}
                     </ReactMarkdown>
+                  </div>
+
+                  <div style={{ marginTop: '24px', borderTop: '1px solid #ffecec', paddingTop: '20px' }}>
+                    <form onSubmit={handleFollowUpSubmit} style={{ display: 'flex', gap: '12px' }}>
+                      <input 
+                        type="text"
+                        value={followUpQuery}
+                        onChange={(e) => setFollowUpQuery(e.target.value)}
+                        placeholder="Ask a follow-up question..."
+                        style={{
+                          flex: 1,
+                          padding: '12px 16px',
+                          borderRadius: '6px',
+                          border: '1px solid #ffd0d6',
+                          fontSize: '14px',
+                          outline: 'none'
+                        }}
+                      />
+                      <button type="submit" className="btn-red" style={{ padding: '0 20px', borderRadius: '6px', fontSize: '14px' }}>
+                        Ask AI
+                      </button>
+                    </form>
                   </div>
                 </motion.div>
               )}
@@ -169,7 +213,7 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
                       margin: '12px 0',
                       lineHeight: '1.2'
                     }}>
-                      {card.summary.split('\n')[0].replace(/#/g, '').trim()}
+                      {cleanLine(card.summary.split('\n')[0])}
                     </motion.h3>
 
                     <motion.div layout className="markdown-content" style={{ 
@@ -181,9 +225,13 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
                       fontSize: '16px',
                       lineHeight: '1.7'
                     }}>
-                      <ReactMarkdown>
-                        {expandedCard === i ? card.summary : (card.summary.split('\n').slice(1).join('\n').trim() || card.summary)}
-                      </ReactMarkdown>
+                      {expandedCard === i ? (
+                        <ReactMarkdown>
+                          {card.summary}
+                        </ReactMarkdown>
+                      ) : (
+                        cleanLine(card.summary.split('\n').slice(1).join(' ').substring(0, 180)) + "..."
+                      )}
                     </motion.div>
                     
                     <AnimatePresence>

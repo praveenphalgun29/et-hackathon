@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { Globe, Search, RefreshCw, Languages } from 'lucide-react';
@@ -21,8 +21,18 @@ export default function VernacularView({ query, persona, language, setLanguage, 
   const [localQuery, setLocalQuery] = useState(query || "");
   const languages = ['English', 'Hindi', 'Tamil', 'Telugu', 'Bengali'];
 
+  useEffect(() => {
+    setActiveTab(language);
+  }, [language]);
+
   const translatedContent = data?.response || "";
   const englishOriginal = data?.englishOriginal || data?.response || "";
+
+  const handleLanguageChange = (newLang) => {
+    setActiveTab(newLang);
+    setLanguage(newLang);
+    onSearch(localQuery || query, newLang);
+  };
 
   if (!data) {
     return (
@@ -99,11 +109,6 @@ export default function VernacularView({ query, persona, language, setLanguage, 
     );
   }
 
-  const handleLanguageChange = (newLang) => {
-    setActiveTab(newLang);
-    setLanguage(newLang);
-    onSearch(localQuery || query, newLang);
-  };
 
   return (
     <div className="max-container">

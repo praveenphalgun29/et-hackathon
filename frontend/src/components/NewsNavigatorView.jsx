@@ -1,10 +1,20 @@
 import React, { useState } from 'react';
 import { Search, Navigation, Sparkles, ArrowRight, Info, MessageSquare, Globe, BookOpen } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 
 export default function NewsNavigatorView({ query, persona, language, onFollowUp, data }) {
   const [localQuery, setLocalQuery] = useState("");
+  const [followUpQuery, setFollowUpQuery] = useState('');
 
+  const handleFollowUpSubmit = (e) => {
+    e.preventDefault();
+    if (followUpQuery.trim() && data) {
+      onFollowUp(data.query || query, null, followUpQuery);
+      setFollowUpQuery('');
+    }
+  };
+// ... suggestions and followUpQuestions ...
   const suggestions = [
     "Sensex 2024 Year-End Target",
     "Jio Financial Services Strategy",
@@ -62,6 +72,52 @@ export default function NewsNavigatorView({ query, persona, language, onFollowUp
             The AI-powered command center for deep financial intelligence. Select a topic or ask your own.
           </p>
         </div>
+
+        {/* Search Result Card */}
+        <AnimatePresence>
+          {data && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="card" 
+              style={{ marginBottom: '48px', borderLeft: '4px solid var(--et-red)', backgroundColor: '#fff8f9' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <Sparkles size={16} color="var(--et-red)" />
+                <span className="text-overline" style={{ margin: 0 }}>AI NAVIGATOR ANALYSIS</span>
+              </div>
+              <div className="markdown-content">
+                <ReactMarkdown>
+                  {data.response || data.detail || "No results found."}
+                </ReactMarkdown>
+              </div>
+
+              <div style={{ marginTop: '24px', borderTop: '1px solid #ffecec', paddingTop: '20px' }}>
+                <form onSubmit={handleFollowUpSubmit} style={{ display: 'flex', gap: '12px' }}>
+                  <input 
+                    type="text"
+                    value={followUpQuery}
+                    onChange={(e) => setFollowUpQuery(e.target.value)}
+                    placeholder="Ask a follow-up question in Navigator..."
+                    style={{
+                      flex: 1,
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #ffd0d6',
+                      fontSize: '14px',
+                      outline: 'none',
+                      background: 'white'
+                    }}
+                  />
+                  <button type="submit" className="btn-red hover-scale" style={{ padding: '0 24px', borderRadius: '8px', fontSize: '14px' }}>
+                    Deep Dive
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '32px' }}>
           {/* Left Column: Trending Topics */}
