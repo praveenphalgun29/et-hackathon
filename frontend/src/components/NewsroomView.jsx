@@ -73,7 +73,6 @@ export default function NewsroomView({ persona, onSearch, briefingData, setBrief
     <div className="max-container">
       <div className="newsroom-grid">
         <div className="briefing-area">
-          {/* ... existing search motion.div ... */}
           <motion.div 
             initial="hidden"
             animate="visible"

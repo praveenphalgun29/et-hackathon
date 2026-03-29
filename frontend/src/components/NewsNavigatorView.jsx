@@ -14,7 +14,6 @@ export default function NewsNavigatorView({ query, persona, language, onFollowUp
       setFollowUpQuery('');
     }
   };
-// ... suggestions and followUpQuestions ...
   const suggestions = [
     "Sensex 2024 Year-End Target",
     "Jio Financial Services Strategy",
