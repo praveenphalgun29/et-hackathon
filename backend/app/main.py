@@ -212,11 +212,9 @@ async def process_topic(topic, request, news_service):
             } for item in news_items
         ]
 
-        # Nitro Mode: If we're using mock data, don't even try AI synthesis (avoids the 20-min hang)
-        if news_items[0].get("metadata", {}).get("is_mock"):
-            print(f"[NITRO MODE] '{topic}' -> Instant summary from mock data.")
-            mock_art = news_items[0]
-            final_summary = f"## {mock_art['metadata']['title']}\n\n{mock_art['metadata']['description']}\n\n*Note: This is a demo-stable summary.*"
+        # Nitro Mode disabled: Always use AI synthesis for persona-aware content
+        if False:
+            pass
         else:
             # Step 2: AI Generation
             inputs = {

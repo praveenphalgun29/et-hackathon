@@ -13,20 +13,23 @@ genai_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
 def call_llm_with_fallback(prompt: str, is_json: bool = False):
-    """Tries Groq, falls back to Gemini."""
+    """Tries Gemini FIRST, falls back to Groq."""
     try:
-        response = groq_llm.invoke(prompt)
-        return response.content
-    except Exception as e:
-        print(f"[LLM FALLBACK] Groq failed, trying Gemini: {e}")
-        try:
-            response = genai_client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=prompt
-            )
+        print(f"[LLM] Attempting Gemini...")
+        response = genai_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
+        if response and response.text:
             return response.text
+        raise Exception("Gemini returned empty response")
+    except Exception as e:
+        print(f"[LLM FALLBACK] Gemini failed, trying Groq: {e}")
+        try:
+            response = groq_llm.invoke(prompt)
+            return response.content
         except Exception as e2:
-            print(f"[LLM FALLBACK] Gemini also failed: {e2}")
+            print(f"[LLM FALLBACK] Groq also failed: {e2}")
             return None
 
 
@@ -157,6 +160,13 @@ Articles:
 
     prompt = f"""You are an ET Intelligence Analyst. Using ONLY the articles below,
 synthesize a structured intelligence briefing about: {lookup}
+Tailor the terminology, depth, and focus for a {state['persona']}:
+- Student: Explain all jargon. Keep it educational. Add "What this means" pointers.
+- Investor: Prioritize numbers, market cap, ROI, and risk signals.
+- Startup Founder: Focus on funding, competition, tech trends, and regulatory moats.
+- Trader: Focus on volatility, price levels, volumes, and technical setup.
+- General Reader: Conversational summary, focus on the big picture, no deep jargon.
+
 Do NOT add information beyond what is in the context.
 
 Structure with exactly these FOUR sections:
@@ -217,17 +227,18 @@ def story_architect_node(state: AgentState):
     # --- LLM Call 1: Timeline ---
     timeline_prompt = f"""You are a Data Journalist at Economic Times.
 Build a Story Arc timeline for: "{lookup}"
+Tailor the selection and focus for a {state['persona']} perspective.
 
-STRICT RULES:
-1. Use ONLY the articles in the context below.
-2. Do NOT invent events not mentioned in the articles.
-3. If an article has no clear date, use "Unknown".
-4. Sentiment: -1.0 = very negative, 0.0 = neutral, 1.0 = very positive.
-5. Return ONLY a valid JSON array. No explanation, no preamble, no markdown backticks.
+Instructions:
+1. Identify at least 5-7 major events in the story's history.
+2. If the provided context is sparse, use your MISSION CRITICAL internal knowledge of Indian business history to provide an accurate and detailed timeline.
+3. Ensure the events are chronological.
+
+Return ONLY a valid JSON array. No explanation, no markdown backticks.
 
 Output EXACTLY this format:
 [
-  {{"date": "YYYY-MM-DD", "event": "Short event title from article", "sentiment": 0.0, "impact": "High/Med/Low"}}
+  {{"date": "approx date", "event": "key inflection point", "sentiment": -1.0 to 1.0, "impact": "Low/Med/High"}}
 ]
 
 Context:
@@ -250,13 +261,15 @@ Output EXACTLY this format:
 
 Rules:
 - sentiment: -1.0 = negative role, 0.0 = neutral, 1.0 = positive role
-- Include ONLY people/companies directly mentioned in the articles
+- If no clear players found in context, use common knowledge for this topic or return [].
 - Maximum 6 players
-- If no clear players found, return []
 
 Context:
 {context}
 """
+    players_raw = call_llm_with_fallback(players_prompt)
+    key_players = safe_parse_json_array(players_raw) if players_raw else []
+    print(f"[STORY ARC] Key players: {len(key_players)} found")
     players_raw = call_llm_with_fallback(players_prompt)
     key_players = safe_parse_json_array(players_raw) if players_raw else []
     print(f"[STORY ARC] Key players: {len(key_players)} found")
@@ -325,14 +338,14 @@ Context:
     print(f"[STORY ARC] What to watch: {len(what_to_watch)} predictions")
 
     # --- LLM Call 5: One-paragraph summary for context ---
-    summary_prompt = f"""In exactly 2 sentences, summarize the current state of the "{lookup}" story
-based ONLY on the articles below. Be factual and specific.
+    summary_prompt = f"""In exactly 2 sentences, summarize the current state of the "{lookup}" story.
+Force a synthesis even if context is sparse. Focus on future trajectory.
 
 Context:
 {context}
 """
     summary_raw = call_llm_with_fallback(summary_prompt)
-    summary = summary_raw.strip() if summary_raw else "Insufficient data for summary."
+    summary = summary_raw.strip().replace('"', '') if summary_raw else f"Tracking the evolution of {lookup} across market cycles."
 
     # --- Combine all 5 components ---
     final_data = {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BookOpen, Search, Sparkles, ArrowRight } from 'lucide-react';
+import { BookOpen, Search, Sparkles, ArrowRight, User, Scale, AlertTriangle, Eye, TrendingUp } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 export default function StoryArcView({ query, onSearch, data }) {
   const [localQuery, setLocalQuery] = useState("");
@@ -100,6 +101,21 @@ export default function StoryArcView({ query, onSearch, data }) {
             </div>
           </div>
         </div>
+
+        {/* Regular AI Response (if not formal arc data) */}
+        {data && !arcData && (
+          <div className="card" style={{ marginTop: '48px', padding: '32px', borderLeft: '4px solid var(--et-red)', backgroundColor: '#fff8f9', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Sparkles size={16} color="var(--et-red)" />
+              <span className="text-overline" style={{ margin: 0 }}>AI STORY ANALYSIS</span>
+            </div>
+            <div className="markdown-content">
+              <ReactMarkdown>
+                {data.response || data.detail || "No results found."}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -156,8 +172,8 @@ export default function StoryArcView({ query, onSearch, data }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 800, marginBottom: '24px', letterSpacing: '2px' }}>
             <BookOpen size={16} /> {query?.toUpperCase() || 'STORY ARC'}
           </div>
-          <h2 style={{ fontSize: '28px', fontWeight: 100, lineHeight: 1.5, maxWidth: '850px', fontStyle: 'italic' }}>
-            "{cleanText(summary)}"
+          <h2 style={{ fontSize: '28px', fontWeight: 500, lineHeight: 1.5, maxWidth: '850px', fontStyle: 'italic', color: 'white' }}>
+            {summary ? `"${cleanText(summary)}"` : "Synthesizing the narrative arc and key inflection points..."}
           </h2>
           <div style={{ display: 'flex', gap: '24px', marginTop: '32px', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '6px', height: '6px', background: 'var(--et-red)', borderRadius: '50%' }}></div> {events.length} Inflection Points</span>
@@ -168,30 +184,32 @@ export default function StoryArcView({ query, onSearch, data }) {
       </div>
 
       {/* Section B - Interactive Timeline */}
-      <div className="animate-fade-in" style={{ marginBottom: '64px', overflowX: 'auto', paddingBottom: '32px', animationDelay: '0.3s' }}>
-        <div style={{ minWidth: '900px', position: 'relative', height: '180px', padding: '0 60px' }}>
-          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '2px', background: 'linear-gradient(to right, transparent, #eee 10%, #eee 90%, transparent)', zIndex: 0 }}></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1, top: 'calc(50% - 15px)' }}>
-            {events.map((ev, i) => (
-              <div key={i} className="hover-lift" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '150px', position: 'relative', cursor: 'pointer' }}>
-                <div style={{
-                  width: getImpactSize(ev.impact === 'High' ? 'High' : 'Med'),
-                  height: getImpactSize(ev.impact === 'High' ? 'High' : 'Med'),
-                  backgroundColor: getSentimentColor(ev.sentiment),
-                  borderRadius: '50%',
-                  border: '4px solid white',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  transition: 'all 0.3s'
-                }}></div>
-                <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--muted-gray)', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.date}</div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px', maxWidth: '120px', lineHeight: '1.4' }}>{cleanText(ev.event)}</div>
+      {events.length > 0 && (
+        <div className="animate-fade-in" style={{ marginBottom: '64px', overflowX: 'auto', paddingBottom: '32px', animationDelay: '0.3s' }}>
+          <div style={{ minWidth: '900px', position: 'relative', height: '180px', padding: '0 60px' }}>
+            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '2px', background: 'linear-gradient(to right, transparent, #eee 10%, #eee 90%, transparent)', zIndex: 0 }}></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', zIndex: 1, top: 'calc(50% - 15px)' }}>
+              {events.map((ev, i) => (
+                <div key={i} className="hover-lift" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '150px', position: 'relative', cursor: 'pointer' }}>
+                  <div style={{
+                    width: getImpactSize(ev.impact === 'High' ? 'High' : 'Med'),
+                    height: getImpactSize(ev.impact === 'High' ? 'High' : 'Med'),
+                    backgroundColor: getSentimentColor(ev.sentiment),
+                    borderRadius: '50%',
+                    border: '4px solid white',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    transition: 'all 0.3s'
+                  }}></div>
+                  <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--muted-gray)', textTransform: 'uppercase', letterSpacing: '1px' }}>{ev.date}</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '6px', maxWidth: '120px', lineHeight: '1.4' }}>{cleanText(ev.event)}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Section C - Key Players */}
       <section style={{ marginBottom: '56px' }}>
